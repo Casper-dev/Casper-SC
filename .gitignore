@@ -1,0 +1,9 @@
+.env
+.DS_Store
+node_modules/
+*.exe
+.idea
+aesexample
+aesexampleinput
+aesexampleoutput
+casper/casper_sc.go
