@@ -1,6 +1,8 @@
 package main
 
-import "github.com/Casper-dev/Casper-SC/casper_sc"
+import (
+	"gitlab.com/casperDev1/Casper-SC/casper_sc"
+)
 
 func main() {
 	Casper_SC.Usage_example()

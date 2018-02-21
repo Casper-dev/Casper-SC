@@ -1,7 +1,6 @@
 package Casper_SC
 
 import (
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
@@ -25,28 +24,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/Casper-dev/Casper-SC/casper"
+	"gitlab.com/casperDev1/Casper-SC/casper"
 )
 
 // with no 0x
-const ContractAddress = "B36482457fE521fAcd46AAB5FF860A99D16Da95d"
+const ContractAddress = "eb9100d37d8fa8A54608cf0eb20671a3bc802E80"
 
-// use your key with no 0x
-const PrivateKey = ""
-
-type Config struct {
-	ipv4Addr string
-
-}
-
-func GetConfig() *Config {
-	return nil
-}
+// with no 0x
+const PrivateKey = "674393e0fb1cba8a71be3f1261e7171effb998bc5047ae0eee8b0e49e556e293"
 
 func GetIPv4() (ip string) {
-
-
-
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		fmt.Println(err)
@@ -78,8 +65,7 @@ func initSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	/**
 	 * Connecting to provider
 	 */
-	///Using ropsten infura addr
-	client, err := ethclient.Dial("https://ropsten.infura.io/**********")
+	client, err := ethclient.Dial("https://ropsten.infura.io/WTu1LsZIdygEHpUcn2Nd")
 
 	if err != nil {
 		log.Fatal(err)
@@ -88,7 +74,6 @@ func initSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	/**
 	 * Connecting to contract at an address
 	 */
-
 
 	contractAddress := common.HexToAddress(ContractAddress)
 	casperSClient, err := casper.NewCasper(contractAddress, client)
@@ -101,8 +86,7 @@ func initSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 
 	auth := bind.NewKeyedTransactor(key)
 	//auth.GasPrice = big.NewInt(250000000)
-	///TODO: gas oracle sometimes fails too hard; for now let's assume all ops are under this gas
-	auth.GasLimit = uint64(500000)
+	auth.GasLimit = uint64(500000);
 	return casperSClient, client, auth
 }
 
@@ -112,6 +96,49 @@ func GetSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	}
 	return casperClient, client, auth
 }
+
+func ValidateMineTX(txGet func() (tx *types.Transaction, err error), client *ethclient.Client) (data string) {
+	tx, err := txGet()
+	for ; err != nil; {
+		fmt.Println(err)
+		tx, err = txGet()
+		time.Sleep(time.Second * 2)
+	}
+	fmt.Printf("Pending TX: 0x%x\n", tx.Hash())
+	data = MineTX(tx, client)
+	return
+}
+
+func MineTX(tx *types.Transaction, client *ethclient.Client) (data string) {
+	fmt.Printf("Gas %d\nGas price %d", tx.Gas(), tx.GasPrice())
+	for ; ; {
+		rxt, pending, err := client.TransactionByHash(context.Background(), tx.Hash())
+		if err != nil {
+			println(err)
+		} else {
+			println("Waiting for TX to mine")
+		}
+		if (!pending) {
+			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
+			fmt.Println(err)
+			if err == nil {
+				println(rxt.String())
+				println("receipt", receipt.Status, receipt.String())
+				if len(receipt.Logs) > 0 {
+					data = string(receipt.Logs[0].Data)
+					fmt.Println(data)
+				}
+			}
+
+			break
+		}
+		time.Sleep(2500 * time.Millisecond)
+
+	}
+	fmt.Println("Tx succesfully mined")
+	return
+}
+
 func Usage_example() {
 
 	casperSClient, client, auth := GetSC()
@@ -121,12 +148,13 @@ func Usage_example() {
 
 	tx_get, err := casperSClient.GetPeers(nil, big.NewInt(int64(1337)))
 
-	tx_msg, errm := hex.DecodeString(tx_get)
+	/*tx_msg, errm := hex.DecodeString(tx_get)
 	if errm != nil {
 		fmt.Println(err)
 	}
 	fmt.Printf("Got %s\n", string(tx_get))
-	fmt.Printf("From hex %s\n", string(tx_msg))
+	*/
+	fmt.Printf("From hex %s\n", "Pl0x make GetNPeers ffs")
 	/**
 	 * Calling contract method
 	 */
@@ -159,9 +187,11 @@ func Usage_example() {
 		time.Sleep(500 * time.Millisecond)
 	}*/
 
+	auth.GasLimit = uint64(1500000)
+	casperSClient.RemoveAllPeers(auth)
 	var tx *types.Transaction
 	for i := 0; i < 1; i++ {
-		tx, err = casperSClient.RemoveProviderMachine(auth, "/ip4/192.168./tcp/4001/ipfs/QmcQsNc79XWhDrHM")
+		tx, err = casperSClient.RemoveProviderMachine(auth, "")
 	}
 	fmt.Println(err)
 	if tx != nil {
@@ -177,13 +207,13 @@ func Usage_example() {
 				println(rxt.String())
 				break
 			}
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(2500 * time.Millisecond)
 		}
 	}
 
 	//_, err = greeterClient.RemoveIP(auth, ip.String())
 	tx_get, err = casperSClient.GetPeers(nil, big.NewInt(int64(1337)))
-	fmt.Printf("Got %s\n", string(tx_get))
+	fmt.Printf("Got %s\n", tx_get.Ip1)
 
 }
 
@@ -192,6 +222,14 @@ func Crypto_Example() {
 	outputFile := "aesexampleoutput"
 	message := []byte("Hello, AES!")
 	ioutil.WriteFile(inputFile, message, os.ModePerm)
+	f, err := os.Create(inputFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := f.Truncate(1e9); err != nil {
+		log.Fatal(err)
+	}
 
 	toEncrypt, _ := ioutil.ReadFile(inputFile)
 
@@ -236,6 +274,6 @@ func Crypto_Example() {
 
 	newstream := cipher.NewCFBDecrypter(newAESBlock, newiv)
 	newstream.XORKeyStream(todecrypt, todecrypt)
-	fmt.Println(string(todecrypt))
+	//fmt.Println(string(todecrypt))
 
 }
