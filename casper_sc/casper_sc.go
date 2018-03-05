@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
-
+	"github.com/Casper-dev/Casper-SC/casper"
 
 	//"time"
 	//"context"
@@ -24,14 +24,16 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"gitlab.com/casperDev1/Casper-SC/casper"
+	"bufio"
+	"strings"
+	rand2 "math/rand"
 )
 
-// with no 0x
-const ContractAddress = "eb9100d37d8fa8A54608cf0eb20671a3bc802E80"
+// with no 0x 		   
+const ContractAddress = "8F98d0170f06dbc7b2D577724765F03B96163D7f"
 
 // with no 0x
-const PrivateKey = "674393e0fb1cba8a71be3f1261e7171effb998bc5047ae0eee8b0e49e556e293"
+const PrivateKey = "674393e0fb1cba8a71be3f1261e7171effc992bc5047ae0efe8b0e49e554e293"
 
 func GetIPv4() (ip string) {
 	ifaces, err := net.Interfaces()
@@ -65,7 +67,7 @@ func initSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	/**
 	 * Connecting to provider
 	 */
-	client, err := ethclient.Dial("https://ropsten.infura.io/WTu1LsZIdygEHpUcn2Nd")
+	client, err := ethclient.Dial("http://94.130.182.144:8545")
 
 	if err != nil {
 		log.Fatal(err)
@@ -85,6 +87,8 @@ func initSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	}
 
 	auth := bind.NewKeyedTransactor(key)
+
+	fmt.Println(client.PendingBalanceAt(context.Background(), auth.From))
 	//auth.GasPrice = big.NewInt(250000000)
 	auth.GasLimit = uint64(500000);
 	return casperSClient, client, auth
@@ -97,12 +101,17 @@ func GetSC() (*casper.Casper, *ethclient.Client, *bind.TransactOpts) {
 	return casperClient, client, auth
 }
 
-func ValidateMineTX(txGet func() (tx *types.Transaction, err error), client *ethclient.Client) (data string) {
+func ValidateMineTX(txGet func() (tx *types.Transaction, err error), client *ethclient.Client, auth *bind.TransactOpts) (data string) {
 	tx, err := txGet()
+	n, _ := rand.Int(rand.Reader, big.NewInt(100000000000))
+	rand2.Seed(n.Int64())
 	for ; err != nil; {
 		fmt.Println(err)
+		nonce, _ := client.PendingNonceAt(context.Background(), auth.From)
+		auth.Nonce = big.NewInt(int64(nonce + rand2.Uint64()%15))
+		fmt.Println("nonce", auth.Nonce)
 		tx, err = txGet()
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Millisecond * time.Duration(100+rand2.Int()%3000))
 	}
 	fmt.Printf("Pending TX: 0x%x\n", tx.Hash())
 	data = MineTX(tx, client)
@@ -110,6 +119,11 @@ func ValidateMineTX(txGet func() (tx *types.Transaction, err error), client *eth
 }
 
 func MineTX(tx *types.Transaction, client *ethclient.Client) (data string) {
+	defer func() {
+		if r:=recover(); r != nil {
+			fmt.Println(r)
+		}
+	}()
 	fmt.Printf("Gas %d\nGas price %d", tx.Gas(), tx.GasPrice())
 	for ; ; {
 		rxt, pending, err := client.TransactionByHash(context.Background(), tx.Hash())
@@ -119,14 +133,19 @@ func MineTX(tx *types.Transaction, client *ethclient.Client) (data string) {
 			println("Waiting for TX to mine")
 		}
 		if (!pending) {
+			fmt.Println("Waiting a second for the receipt")
+			time.Sleep(1 * time.Second)
+			fmt.Println("getting receipt")
 			receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 			fmt.Println(err)
 			if err == nil {
 				println(rxt.String())
 				println("receipt", receipt.Status, receipt.String())
 				if len(receipt.Logs) > 0 {
-					data = string(receipt.Logs[0].Data)
-					fmt.Println(data)
+					for _, log := range receipt.Logs {
+						data += string(log.Data)
+					}
+					fmt.Println("data", data)
 				}
 			}
 
@@ -146,8 +165,8 @@ func Usage_example() {
 
 	fmt.Printf("wallet %s\n", auth.From.String())
 
-	tx_get, err := casperSClient.GetPeers(nil, big.NewInt(int64(1337)))
-
+	tx_get, err := casperSClient.GetPeers(nil, big.NewInt(int64(13353457)))
+	fmt.Println(tx_get)
 	/*tx_msg, errm := hex.DecodeString(tx_get)
 	if errm != nil {
 		fmt.Println(err)
@@ -188,29 +207,41 @@ func Usage_example() {
 	}*/
 
 	auth.GasLimit = uint64(1500000)
-	casperSClient.RemoveAllPeers(auth)
-	var tx *types.Transaction
-	for i := 0; i < 1; i++ {
-		tx, err = casperSClient.RemoveProviderMachine(auth, "")
-	}
-	fmt.Println(err)
-	if tx != nil {
-		fmt.Printf("Gas price: %d\n", tx.GasPrice())
-		for {
-			rxt, pending, err := client.TransactionByHash(context.Background(), tx.Hash())
-			if err != nil {
-				println(err)
-			} else {
-				println("Waiting for TX to mine")
-			}
-			if !pending {
-				println(rxt.String())
-				break
-			}
-			time.Sleep(2500 * time.Millisecond)
+	//var tx *types.Transaction
+	fmt.Println("getting peers: ")
+	fmt.Println(casperSClient.GetPeers(nil, big.NewInt(213434)))
+
+	fmt.Println(casperSClient.VerifyReplication(nil, "/ip4/192.168.120.55/tcp/4001/ipfs/QmRFXdsPm6d6yr3izZEBK7oqZhPvmGUr5V3XnAKM2J8V8s"))
+	removePeersClosure := func(ip string) func() (*types.Transaction, error) {
+		//return casperSClient.RemoveAllPeers(auth)
+		return func() (*types.Transaction, error) {
+			return casperSClient.RemoveAllPeers(auth)
 		}
 	}
+	buf := bufio.NewReader(os.Stdin)
+	fmt.Println("> Get peers for hash")
+	sentenceo, err := buf.ReadString('\n')
+	n, _ := casperSClient.GetStoringPeers(nil, sentenceo)
+	fmt.Println("read ", sentenceo, n)
 
+	fmt.Println(err)
+	fmt.Println(removePeersClosure)
+	fmt.Println("> remove all peers? (Y/N)")
+	sentence, err := buf.ReadString('\n')
+	fmt.Println("read ", sentence)
+	if strings.ContainsAny(sentence, "yY") {
+		for ; ; {
+			tx, _ := casperSClient.GetPeers(nil, big.NewInt(34234))
+			if tx.Ip1 == "" {
+				break
+			}
+			fmt.Println("removing ", tx.Ip1)
+			ValidateMineTX(removePeersClosure(tx.Ip1), client, auth)
+			fmt.Println("removed ", tx.Ip1)
+		}
+	}
+	fmt.Println("getting peers: ")
+	fmt.Println(casperSClient.GetPeers(nil, big.NewInt(213434)))
 	//_, err = greeterClient.RemoveIP(auth, ip.String())
 	tx_get, err = casperSClient.GetPeers(nil, big.NewInt(int64(1337)))
 	fmt.Printf("Got %s\n", tx_get.Ip1)
