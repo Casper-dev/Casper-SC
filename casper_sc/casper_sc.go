@@ -24,13 +24,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"bufio"
-	"strings"
+	
 	rand2 "math/rand"
 )
 
 // with no 0x 		   
-const ContractAddress = "8F98d0170f06dbc7b2D577724765F03B96163D7f"
+const ContractAddress = "A0753c1D7C34204C9a8cf04D765E9A08Cd3BDbe3"
 
 // with no 0x
 const PrivateKey = "674393e0fb1cba8a71be3f1261e7171effc992bc5047ae0efe8b0e49e554e293"
@@ -48,7 +47,8 @@ func GetIPv4() (ip string) {
 		for _, addr := range addrs {
 			switch v := addr.(type) {
 			case *net.IPNet:
-				if v.IP.To4() != nil && !v.IP.IsLoopback() {
+				fmt.Println("IP", v.IP.String(), "is linklocal", v.IP.IsGlobalUnicast(), v.IP.IsLinkLocalUnicast(), v.IP.IsInterfaceLocalMulticast(), v.IP.IsLinkLocalMulticast())
+				if v.IP.To4() != nil && !v.IP.IsLoopback() && !v.IP.IsLinkLocalUnicast() {
 					ip = v.IP.String()
 					fmt.Printf("got ipv4: %s, %s\n", ip, addr.Network())
 				}
@@ -160,25 +160,33 @@ func MineTX(tx *types.Transaction, client *ethclient.Client) (data string) {
 
 func Usage_example() {
 
-	casperSClient, client, auth := GetSC()
+	casperSClient, _, _:= GetSC()
+
+
+	ips, _ := casperSClient.GetAllPeers(nil)
+	for _, ip := range ips  {
+		fmt.Println(string(ip[:31]))
+	}
+
+/*
 	fmt.Printf("%d\n", auth.GasPrice, client)
 
 	fmt.Printf("wallet %s\n", auth.From.String())
 
 	tx_get, err := casperSClient.GetPeers(nil, big.NewInt(int64(13353457)))
 	fmt.Println(tx_get)
-	/*tx_msg, errm := hex.DecodeString(tx_get)
+	*//*tx_msg, errm := hex.DecodeString(tx_get)
 	if errm != nil {
 		fmt.Println(err)
 	}
 	fmt.Printf("Got %s\n", string(tx_get))
-	*/
+	*//*
 	fmt.Printf("From hex %s\n", "Pl0x make GetNPeers ffs")
-	/**
+	*//**
 	 * Calling contract method
-	 */
+	 *//*
 
-	/*ip := GetIPv4()
+	*//*ip := GetIPv4()
 
 
 	tx, err := casperSClient.Register(auth, ip, big.NewInt(int64(1337)))
@@ -204,7 +212,7 @@ func Usage_example() {
 			break
 		}
 		time.Sleep(500 * time.Millisecond)
-	}*/
+	}*//*
 
 	auth.GasLimit = uint64(1500000)
 	//var tx *types.Transaction
@@ -244,7 +252,7 @@ func Usage_example() {
 	fmt.Println(casperSClient.GetPeers(nil, big.NewInt(213434)))
 	//_, err = greeterClient.RemoveIP(auth, ip.String())
 	tx_get, err = casperSClient.GetPeers(nil, big.NewInt(int64(1337)))
-	fmt.Printf("Got %s\n", tx_get.Ip1)
+	fmt.Printf("Got %s\n", tx_get.Ip1)*/
 
 }
 
